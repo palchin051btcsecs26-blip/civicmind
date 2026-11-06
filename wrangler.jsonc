@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "civicmind",
+  "main": "server/index.ts",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "civicmind-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "db"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

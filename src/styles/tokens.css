@@ -1,0 +1,84 @@
+:root {
+  /* Core palette */
+  --navy-950: #060d16;
+  --navy-900: #0a1420;
+  --navy-850: #0d1a27;
+  --navy-800: #112130;
+  --navy-700: #1a2f41;
+  --navy-600: #23394c;
+
+  --slate-700: #33465a;
+  --slate-600: #43596c;
+  --slate-500: #5a6f80;
+  --slate-400: #7c8d9a;
+  --slate-300: #a6b2bc;
+
+  --ivory-50: #fdfbf5;
+  --ivory-100: #f8f4ea;
+  --ivory-200: #f1ecdf;
+  --ivory-300: #e7e0cf;
+  --line: #e3dccb;
+  --line-soft: #ece6da;
+
+  --ink-900: #0f1e2b;
+  --ink-700: #21323f;
+  --ink-500: #4a5b68;
+
+  --teal-700: #1e5b54;
+  --teal-600: #256c64;
+  --teal-500: #2f7f75;
+  --teal-400: #57a097;
+  --teal-200: #b9d5cd;
+  --teal-100: #deebe6;
+  --teal-50: #eef5f1;
+
+  --olive-700: #56652f;
+  --olive-600: #6b7a45;
+  --olive-500: #7f8e56;
+  --olive-200: #ccd2b1;
+  --olive-100: #e9ecd9;
+
+  --coral-700: #a83f32;
+  --coral-600: #c24f40;
+  --coral-500: #d4614f;
+  --coral-200: #f0c4b9;
+  --coral-100: #f8e2dc;
+
+  --amber-700: #8f6417;
+  --amber-600: #b6801f;
+  --amber-500: #d29a34;
+  --amber-200: #efd8a5;
+  --amber-100: #f9eed5;
+
+  --sand-500: #b5a37c;
+
+  --on-dark: #f3efe3;
+  --on-dark-muted: #a9b7bf;
+
+  /* Type */
+  --font-sans: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces Variable', 'Fraunces', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Radius + elevation */
+  --r-xs: 6px;
+  --r-sm: 9px;
+  --r-md: 13px;
+  --r-lg: 18px;
+  --r-xl: 26px;
+  --r-pill: 999px;
+
+  --shadow-xs: 0 1px 2px rgba(15, 30, 43, 0.05);
+  --shadow-sm: 0 1px 2px rgba(15, 30, 43, 0.05), 0 4px 12px -8px rgba(15, 30, 43, 0.18);
+  --shadow-md: 0 18px 40px -28px rgba(10, 20, 32, 0.45), 0 2px 6px rgba(15, 30, 43, 0.04);
+  --shadow-lg: 0 40px 80px -50px rgba(6, 13, 22, 0.6);
+
+  /* Layout */
+  --sidebar-w: 268px;
+  --topbar-h: 68px;
+  --page-max: 1240px;
+  --pad: 28px;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --transition: 180ms var(--ease);
+}
