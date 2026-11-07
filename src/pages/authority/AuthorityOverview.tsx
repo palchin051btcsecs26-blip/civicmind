@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { AgentMapWorkspace } from '../../components/AgentMapWorkspace'
 import { AppShell } from '../../components/AppShell'
 import { Icon } from '../../components/Icon'
 import { LineChart, StackedBar } from '../../components/charts'
@@ -47,6 +48,8 @@ export function AuthorityOverview() {
         }
       />
 
+      <AgentMapWorkspace role="admin" />
+
       {loading ? <Loading label="Loading the municipal overview…" /> : null}
       {error ? <ErrorState message={error} onRetry={reload} /> : null}
 
@@ -72,7 +75,7 @@ export function AuthorityOverview() {
             </div>
           ) : null}
 
-          <div className="stat-grid">
+          <div className="stat-grid mt-16">
             <StatCard
               label="Open incidents"
               value={formatNumber(totals.open)}
@@ -328,8 +331,9 @@ export function AuthorityOverview() {
                     Control room note
                   </span>
                   <p style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.65, color: 'rgba(243,239,227,0.66)' }}>
-                    Priority scores combine severity, affected population and recurrence. AI triage is prepared in the data
-                    model but is not enabled in this build — every assignment here is manual.
+                    Priority scores combine severity, affected population and recurrence. The CivicMind agent above can
+                    classify a new incident and recommend a department; every assignment and status change remains a
+                    deliberate manual decision by an authorised officer.
                   </p>
                   <div style={{ marginTop: 14 }}>
                     <Link to="/authority/departments" className="btn btn--ghost-light btn--sm btn--block">

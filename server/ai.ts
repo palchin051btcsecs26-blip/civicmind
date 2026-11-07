@@ -80,8 +80,9 @@ export interface AgentDuplicate {
 
 export interface AgentResult {
   source: 'groq' | 'local'
+  kind?: 'analysis' | 'records'
   reply: string
-  findings: AgentFinding
+  findings?: AgentFinding
   duplicates: AgentDuplicate[]
   matchedIncidentIds: string[]
   notice?: string

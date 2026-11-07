@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Icon } from './Icon'
 import { Badge, Card, CardBody, CardHead, Notice } from './ui'
 import { api } from '../lib/api'
-import type { AgentResult, Incident } from '../lib/types'
+import type { AgentResult, Incident, Role } from '../lib/types'
 
 interface Attachment {
   kind: 'image' | 'audio'
@@ -22,20 +22,52 @@ interface ChatMessage {
 
 interface AgentProps {
   incidents: Incident[]
+  role: Role
+  userName?: string
   contextIncident: Incident | null
   contextNonce: number
   onHighlight: (ids: string[]) => void
   onOpenIncident: (incident: Incident) => void
 }
 
-const GREETING =
-  'I read a civic complaint, classify it, check for duplicate reports and connect the result to the map. Describe an issue, attach a photo or voice note, or pick a marker and send it to me.'
+function greetingFor(role: Role, userName?: string) {
+  const hour = new Date().getHours()
+  const partOfDay = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const firstName = userName?.trim().split(/\s+/)[0]
+  const greeting = firstName ? `${partOfDay}, ${firstName}.` : `${partOfDay}.`
 
-const SUGGESTIONS = [
-  'Sewage is overflowing near Campal and children walk through it.',
-  'Streetlights are out along the Baga beach road at night.',
-  'Find recurring waste complaints around Calangute beach.',
-]
+  if (role === 'citizen') {
+    return `${greeting} I am your CivicMind civic agent. Describe a new issue, ask me what is happening with your complaints, or open an incident on the map and send it to me for a priority and department recommendation.`
+  }
+  if (role === 'admin') {
+    return `${greeting} I am your CivicMind triage agent. Describe an incident for a priority, duplicate and department recommendation, or select a marker on the live map and ask me to analyse it. I can also explain the public incident index; I never change a case myself.`
+  }
+  return `${partOfDay}. You are browsing as a guest, so I can explain public incident data and the live map only. Citizen reports, personal complaint histories and authority actions stay private.`
+}
+
+function suggestionsFor(role: Role) {
+  if (role === 'citizen') {
+    return [
+      'What is the status of my complaints?',
+      'Sewage is overflowing near Campal and children walk through it.',
+      'Streetlights are out along the Baga beach road at night.',
+      'Find recurring waste complaints around Calangute beach.',
+    ]
+  }
+  if (role === 'admin') {
+    return [
+      'Sewage is overflowing near Campal and children walk through it.',
+      'Find recurring waste complaints around Calangute beach.',
+      'Streetlights are out along the Baga beach road at night.',
+      'There is illegal debris dumping along the Ribandar causeway.',
+    ]
+  }
+  return [
+    'Show recurring waste complaints around Calangute beach.',
+    'Streetlights are out along the Baga beach road at night.',
+    'Sewage is overflowing near Campal.',
+  ]
+}
 
 function newId() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -54,9 +86,9 @@ function readAsData(file: Blob): Promise<{ data: string; preview?: string }> {
   })
 }
 
-export function CivicAgent({ incidents, contextIncident, contextNonce, onHighlight, onOpenIncident }: AgentProps) {
+export function CivicAgent({ incidents, role, userName, contextIncident, contextNonce, onHighlight, onOpenIncident }: AgentProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'greeting', role: 'assistant', content: GREETING },
+    { id: 'greeting', role: 'assistant', content: greetingFor(role, userName) },
   ])
   const [input, setInput] = useState('')
   const [image, setImage] = useState<Attachment | null>(null)
@@ -77,6 +109,8 @@ export function CivicAgent({ incidents, contextIncident, contextNonce, onHighlig
 
   const lastResult = [...messages].reverse().find((message) => message.result)?.result
   const source = lastResult?.source
+  const badgeLabel =
+    lastResult?.kind === 'records' ? 'Your records' : source === 'groq' ? 'Groq live' : source === 'local' ? 'Demo reasoner' : 'Groq-ready'
 
   useEffect(() => {
     const thread = threadRef.current
@@ -237,8 +271,8 @@ export function CivicAgent({ incidents, contextIncident, contextNonce, onHighlig
         title="CivicMind AI agent"
         sub="Classify, de-duplicate and route — with the map as its evidence board."
         action={
-          <Badge tone={source === 'groq' ? 'progress' : source === 'local' ? 'neutral' : 'neutral'} plain>
-            {source === 'groq' ? 'Groq live' : source === 'local' ? 'Demo reasoner' : 'Groq-ready'}
+          <Badge tone={source === 'groq' ? 'progress' : 'neutral'} plain>
+            {badgeLabel}
           </Badge>
         }
       />
@@ -264,34 +298,36 @@ export function CivicAgent({ incidents, contextIncident, contextNonce, onHighlig
 
                 {message.result ? (
                   <>
-                    <div className="agent-findings">
-                      <div>
-                        <span>Category</span>
-                        <strong>{message.result.findings.category}</strong>
+                    {message.result.findings ? (
+                      <div className="agent-findings">
+                        <div>
+                          <span>Category</span>
+                          <strong>{message.result.findings.category}</strong>
+                        </div>
+                        <div>
+                          <span>Priority</span>
+                          <strong>
+                            {message.result.findings.priority}/100 · {message.result.findings.severity}
+                          </strong>
+                        </div>
+                        <div>
+                          <span>Department</span>
+                          <strong>{message.result.findings.department}</strong>
+                        </div>
+                        <div>
+                          <span>Location</span>
+                          <strong>{message.result.findings.location ?? message.result.findings.city ?? 'Not specified'}</strong>
+                        </div>
+                        <div>
+                          <span>Confidence</span>
+                          <strong>{Math.round(message.result.findings.confidence * 100)}%</strong>
+                        </div>
+                        <div>
+                          <span>Source</span>
+                          <strong>{message.result.source === 'groq' ? 'Groq' : message.result.kind === 'records' ? 'Your records' : 'Local demo'}</strong>
+                        </div>
                       </div>
-                      <div>
-                        <span>Priority</span>
-                        <strong>
-                          {message.result.findings.priority}/100 · {message.result.findings.severity}
-                        </strong>
-                      </div>
-                      <div>
-                        <span>Department</span>
-                        <strong>{message.result.findings.department}</strong>
-                      </div>
-                      <div>
-                        <span>Location</span>
-                        <strong>{message.result.findings.location ?? message.result.findings.city ?? 'Not specified'}</strong>
-                      </div>
-                      <div>
-                        <span>Confidence</span>
-                        <strong>{Math.round(message.result.findings.confidence * 100)}%</strong>
-                      </div>
-                      <div>
-                        <span>Source</span>
-                        <strong>{message.result.source === 'groq' ? 'Groq' : 'Local demo'}</strong>
-                      </div>
-                    </div>
+                    ) : null}
 
                     {message.result.duplicates.length ? (
                       <div className="agent-dupes">
@@ -309,11 +345,16 @@ export function CivicAgent({ incidents, contextIncident, contextNonce, onHighlig
                       </div>
                     ) : null}
 
-                    <div className="agent-result-actions">
-                      <button type="button" className="btn btn--ghost btn--xs" onClick={() => onHighlight(message.result?.matchedIncidentIds ?? [])}>
-                        <Icon name="map" size={13} /> Highlight {message.result.matchedIncidentIds.length} on map
-                      </button>
-                    </div>
+                    {message.result.matchedIncidentIds.length ? (
+                      <div className="agent-result-actions">
+                        <button type="button" className="btn btn--ghost btn--xs" onClick={() => onHighlight(message.result?.matchedIncidentIds ?? [])}>
+                          <Icon name="map" size={13} />
+                          {message.result.kind === 'records'
+                            ? `Highlight my ${message.result.matchedIncidentIds.length} complaint${message.result.matchedIncidentIds.length === 1 ? '' : 's'}`
+                            : `Highlight ${message.result.matchedIncidentIds.length} on map`}
+                        </button>
+                      </div>
+                    ) : null}
 
                     {message.result.notice ? <p className="agent-notice">{message.result.notice}</p> : null}
                   </>
@@ -337,7 +378,7 @@ export function CivicAgent({ incidents, contextIncident, contextNonce, onHighlig
 
         {messages.length === 1 ? (
           <div className="agent-suggestions">
-            {SUGGESTIONS.map((suggestion) => (
+            {suggestionsFor(role).map((suggestion) => (
               <button key={suggestion} type="button" onClick={() => void send(suggestion)}>
                 {suggestion}
               </button>

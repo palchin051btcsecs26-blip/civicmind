@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { AgentMapWorkspace } from '../../components/AgentMapWorkspace'
 import { AppShell } from '../../components/AppShell'
 import { Icon } from '../../components/Icon'
 import { Badge, Card, CardBody, CardHead, LinkButton, PageHeader, SeverityBadge, StatCard, StatusBadge } from '../../components/ui'
@@ -34,7 +35,9 @@ export function CitizenOverview() {
         }
       />
 
-      <div className="stat-grid">
+      <AgentMapWorkspace role="citizen" />
+
+      <div className="stat-grid mt-16">
         <StatCard label="My complaints" value={data?.stats.total ?? '—'} foot="Across Panaji wards" icon="file" />
         <StatCard label="Open now" value={data?.stats.open ?? '—'} foot="With municipal teams" icon="clock" />
         <StatCard label="Resolved" value={data?.stats.resolved ?? '—'} foot="Evidence uploaded on closure" icon="checkCircle" />

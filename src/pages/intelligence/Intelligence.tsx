@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { AgentMapWorkspace } from '../../components/AgentMapWorkspace'
 import { AppShell } from '../../components/AppShell'
-import { CivicAgent } from '../../components/CivicAgent'
-import { IncidentDrawer } from '../../components/IncidentDrawer'
-import { LiveCivicMap } from '../../components/LiveCivicMap'
 import { Icon } from '../../components/Icon'
 import { BarList, Donut, StackedBar } from '../../components/charts'
 import {
@@ -21,25 +19,17 @@ import {
 } from '../../components/ui'
 import { useApi } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-import type { Analytics, Incident } from '../../lib/types'
+import type { Analytics } from '../../lib/types'
 import { CATEGORY_COLORS, CHART_COLORS, CITIES, CITY_META, formatNumber, formatDay } from '../../lib/ui'
 
 export function Intelligence() {
   const { data, loading, error, reload } = useApi<Analytics>('/api/analytics')
-  const { data: mapData, loading: mapLoading, error: mapError, reload: reloadMap } = useApi<{ incidents: Incident[] }>(
-    '/api/incidents?limit=100',
-  )
   const { user } = useAuth()
   const isGuest = user?.role === 'guest'
 
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
-  const [highlightedIds, setHighlightedIds] = useState<string[]>([])
-  const [agentContext, setAgentContext] = useState<{ incident: Incident; nonce: number } | null>(null)
   const [params] = useSearchParams()
   const view = params.get('view')
-
-  const mapIncidents = mapData?.incidents ?? []
 
   useEffect(() => {
     if (!view) return
@@ -49,16 +39,6 @@ export function Intelligence() {
     }, 180)
     return () => window.clearTimeout(timer)
   }, [view])
-
-  const openIncident = useCallback((incident: Incident) => setSelectedIncident(incident), [])
-
-  const analyseIncident = useCallback((incident: Incident) => {
-    setSelectedIncident(null)
-    setAgentContext({ incident, nonce: Date.now() })
-    window.setTimeout(() => {
-      document.querySelector('.agent-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 120)
-  }, [])
 
   const categoryTotals = useMemo(() => {
     if (!data) return []
@@ -122,9 +102,11 @@ export function Intelligence() {
       {loading ? <Loading label="Building the intelligence view…" /> : null}
       {error ? <ErrorState message={error} onRetry={reload} /> : null}
 
+      <AgentMapWorkspace role={user?.role ?? 'guest'} />
+
       {data ? (
         <>
-          <div className="stat-grid">
+          <div className="stat-grid mt-16">
             <StatCard
               label="Open incidents"
               value={formatNumber(data.cities.reduce((sum, city) => sum + city.open, 0))}
@@ -140,43 +122,6 @@ export function Intelligence() {
               icon="clock"
             />
           </div>
-
-          <div className="intel-hero">
-            <CivicAgent
-              incidents={mapIncidents}
-              contextIncident={agentContext?.incident ?? null}
-              contextNonce={agentContext?.nonce ?? 0}
-              onHighlight={setHighlightedIds}
-              onOpenIncident={openIncident}
-            />
-
-            <Card className="map-card map-card--live">
-              <CardHead
-                title="Interactive civic map"
-                sub="Leaflet + OpenStreetMap. Filter, cluster and open any incident; the agent responds to what you select."
-                action={<Badge tone="progress">Live pilot view</Badge>}
-              />
-              <CardBody>
-                <LiveCivicMap
-                  incidents={mapIncidents}
-                  highlightedIds={highlightedIds}
-                  selectedId={selectedIncident?.id ?? null}
-                  loading={mapLoading}
-                  error={mapError}
-                  onSelectIncident={openIncident}
-                  onClearHighlight={() => setHighlightedIds([])}
-                />
-              </CardBody>
-            </Card>
-          </div>
-
-          {mapError ? (
-            <div style={{ marginTop: 10 }}>
-              <Button variant="ghost" size="sm" icon="refresh" onClick={reloadMap}>
-                Retry map data
-              </Button>
-            </div>
-          ) : null}
 
           <div className="intel-summary-grid">
             <Card>
@@ -620,8 +565,6 @@ export function Intelligence() {
           </div>
         </>
       ) : null}
-
-      <IncidentDrawer incident={selectedIncident} onClose={() => setSelectedIncident(null)} onAnalyse={analyseIncident} />
     </AppShell>
   )
 }

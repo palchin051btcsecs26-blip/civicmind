@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { SEED_CITIZENS, SEED_DEPARTMENTS, SEED_INCIDENTS, SEED_LOCATIONS, OFFICERS } from './seed'
 import type { CitizenRow, DepartmentRow, IncidentRow, LocationRow, ResolutionRow, UpdateRow } from './types'
-import { runAgent, type ReferenceDepartment, type ReferenceIncident, type ReferenceLocation } from './ai'
+import { runAgent, type AgentResult, type ReferenceDepartment, type ReferenceIncident, type ReferenceLocation } from './ai'
 import {
   clearSession,
   ensureAccounts,
@@ -996,6 +996,110 @@ app.get('/api/meta', async (c) => {
 
 /* --------------------------------- AI agent -------------------------------- */
 
+const PERSONAL_COMPLAINT = /\b(complaint|complaints|report|reports|issue|issues|case|cases)\b/i
+const STATUS_QUESTION =
+  /\b(status|update|updates|track|progress|where|what|when|how|show|list|summar|closed|resolved|open|latest)\b/i
+
+function asksAboutOwnComplaints(message: string) {
+  if (/CM-\d+/i.test(message)) return true
+  return /\b(my|mine)\b/i.test(message) && PERSONAL_COMPLAINT.test(message) && STATUS_QUESTION.test(message)
+}
+
+interface PersonalComplaintRow {
+  id: string
+  ref: string
+  title: string
+  status: string
+  severity: string
+  category: string
+  priority_score: number
+  updated_at: string
+  department_short: string | null
+}
+
+function complaintStatusLabel(status: string) {
+  return status.replace(/_/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase())
+}
+
+function complaintNextStep(status: string) {
+  if (status === 'submitted') return 'It has been received and is waiting for intake routing.'
+  if (status === 'under_review') return 'The department is reviewing it before field assignment.'
+  if (status === 'assigned') return 'A field team has been assigned and should verify the site next.'
+  if (status === 'in_progress') return 'Work is in progress with the assigned department.'
+  if (status === 'resolved') return 'It is closed. If the fix is not right, reopen it from your complaint page.'
+  return 'The municipal team has the latest update on this case.'
+}
+
+async function answerFromComplaintRecords(
+  db: D1Database,
+  citizenId: string,
+  message: string,
+): Promise<AgentResult | null> {
+  if (!asksAboutOwnComplaints(message)) return null
+
+  const { results } = await db
+    .prepare(
+      `SELECT i.id, i.ref, i.title, i.status, i.severity, i.category, i.priority_score, i.updated_at,
+              d.short_name AS department_short
+       FROM incidents i
+       LEFT JOIN departments d ON d.id = i.department_id
+       WHERE i.reported_by = ?
+       ORDER BY i.reported_at DESC`,
+    )
+    .bind(citizenId)
+    .all<PersonalComplaintRow>()
+
+  const ref = message.match(/CM-\d+/i)?.[0]?.toUpperCase() ?? null
+  const reports = results ?? []
+
+  if (!reports.length) {
+    return {
+      source: 'local',
+      kind: 'records',
+      reply:
+        "I could not find any complaints filed from your CivicMind account yet. Describe the issue here for a classification, or use Report an issue to file it with the municipality.",
+      duplicates: [],
+      matchedIncidentIds: [],
+      imageAnalysed: false,
+      notice: 'Answered from the complaint records attached to your CivicMind account.',
+    }
+  }
+
+  const target = ref ? reports.find((report) => report.ref === ref) ?? null : null
+  if (ref && !target) {
+    return {
+      source: 'local',
+      kind: 'records',
+      reply: `I cannot find ${ref} among the complaints filed from your CivicMind account. For privacy, I can only read your own complaint records. Ask me about another reference, or open My complaints to review your full history.`,
+      duplicates: [],
+      matchedIncidentIds: [],
+      imageAnalysed: false,
+      notice: 'Answered from the complaint records attached to your CivicMind account.',
+    }
+  }
+
+  const selected = target ? [target] : reports.slice(0, 5)
+  const open = reports.filter((report) => report.status !== 'resolved').length
+  const resolved = reports.filter((report) => report.status === 'resolved').length
+  const intro = target
+    ? `Here is where ${target.ref} stands in your complaint history.`
+    : `You have ${reports.length} complaint${reports.length === 1 ? '' : 's'} on record: ${open} still open and ${resolved} resolved.${reports.length > 5 ? ' These are the five most recent.' : ''}`
+  const lines = selected.map((report) => {
+    const updated = new Date(report.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    return `${report.ref} — ${report.title}\n${complaintStatusLabel(report.status)} · ${report.department_short ?? 'Intake'} · ${report.severity} severity · updated ${updated}\n${complaintNextStep(report.status)}`
+  })
+
+  return {
+    source: 'local',
+    kind: 'records',
+    reply: `${intro}\n\n${lines.join('\n\n')}\n\nFor the full timeline and any resolution evidence, open My complaints.`,
+    duplicates: [],
+    matchedIncidentIds: selected.map((report) => report.id),
+    imageAnalysed: false,
+    notice: 'Answered from the complaint records attached to your CivicMind account.',
+  }
+}
+
 app.post('/api/ai/agent', async (c) => {
   const session = c.get('session')
   if (!session) return json({ error: 'Sign in to use the CivicMind AI agent.' }, 401)
@@ -1022,6 +1126,12 @@ app.post('/api/ai/agent', async (c) => {
 
   if (!message && !image && !audio && !incidentId) {
     return json({ error: 'Ask a question, attach a photo or voice note, or select an incident first.' }, 422)
+  }
+
+  // A selected marker is an incident-analysis request, even when its reference is in the prompt.
+  if (session.role === 'citizen' && session.citizenId && !image && !audio && message && !incidentId) {
+    const recordsAnswer = await answerFromComplaintRecords(c.env.DB, session.citizenId, message)
+    if (recordsAnswer) return json({ ...recordsAnswer, contextRef: null })
   }
 
   const history = Array.isArray(body.history)

@@ -4,7 +4,8 @@
 
 CivicMind is a civic intelligence and grievance resolution platform for Indian municipalities. This build is the
 Phase 1 product foundation for the **Goa pilot** (Panaji, Calangute, Margao): a welcome and authentication entry,
-a citizen portal, a municipal authority dashboard and a civic intelligence workspace with a live map and an AI agent.
+a citizen portal, a municipal authority dashboard and a civic intelligence workspace. Every signed-in workspace
+opens with the CivicMind AI agent and the live incident map, with its role-specific records and tools below.
 
 > **Data disclosure:** every citizen, complaint, resolution and response time in this repository is **synthetic**.
 > The dataset was authored for demonstration. It is not sourced from municipal records and must not be presented as
@@ -77,6 +78,10 @@ npx wrangler deploy
 The welcome page can fill either account in one click. Authority accounts cannot be created publicly. Guest access
 creates a 12-hour read-only session without an account. Citizen and authority sessions last seven days.
 
+The profile menu at the top right of every workspace shows the current role and offers **Log out** for citizens and
+officers, or **Exit guest** for visitors. Logging out calls the API, invalidates the session in D1 and clears the
+HttpOnly cookie before returning to `/welcome`; a previous session cannot reopen a protected route.
+
 ## Entry and access
 
 `/welcome` is the default entry for signed-out visitors. It offers three routes:
@@ -98,29 +103,35 @@ the same roles on every API request.
 | `/login`                  | Signed out        | Redirects to `/welcome`                                         |
 | `/`                       | Any session       | Landing page; signed-out visitors are sent to `/welcome`        |
 | `/about`                  | Public            | About, architecture, roadmap, data disclosure                   |
-| `/citizen`                | Citizen           | Citizen overview                                                |
+| `/citizen`                | Citizen           | AI agent, live map, personal complaint tracking                |
 | `/citizen/report`         | Citizen           | Complaint submission (photos, voice note, location)             |
 | `/citizen/reports`        | Citizen           | Complaint history + full status timeline                        |
 | `/citizen/nearby`         | Citizen           | Nearby civic issues and city map                                |
 | `/citizen/notifications`  | Citizen           | Notification inbox                                              |
-| `/authority`              | Authority         | Municipal overview: intake, SLA, priority queue                 |
+| `/authority`              | Authority         | AI agent, live map, intake, SLA and priority queue              |
 | `/authority/incidents`    | Authority         | Filterable complaint register                                   |
 | `/authority/incidents/:ref` | Authority       | Incident detail, assignment, status updates, resolution         |
 | `/authority/priority`     | Authority         | Priority and SLA risk queue                                     |
 | `/authority/departments`  | Authority         | Department workload and resolution performance                  |
-| `/intelligence`           | Any session       | AI agent, live incident map and civic analytics                 |
+| `/intelligence`           | Any session       | AI agent, public map and civic analytics                        |
 
 Unauthorised roles are redirected to their own workspace. The `/intelligence` page also accepts
 `?view=recurrence`, `?view=tourism` and `?view=performance` for the sidebar shortcuts.
 
-## Intelligence workspace
+## Primary dashboard experience
 
-- **CivicMind AI agent** classifies a description, estimates severity and priority, recommends a department,
-  identifies possible duplicates, explains its reasoning and highlights matching incidents on the map. With a Groq
-  key it also understands attached images and transcribes voice notes. The agent is read-only.
+Every citizen, authority and guest workspace opens with the same AI-and-map section before its statistics and tools.
+
+- **CivicMind AI agent** greets the signed-in user by role and name, classifies a description, estimates severity
+  and priority, recommends a department, identifies possible duplicates, explains its reasoning and highlights
+  matching incidents on the map. Citizens can ask about their own complaint history; the agent answers from their
+  D1 records, with status, department and next step, and never reads another citizen's cases. With a Groq key it
+  also understands attached images and transcribes voice notes. The agent is read-only.
 - **Live civic map** uses Leaflet with clustered markers, filters for location, category, priority and status,
   AI-match highlighting, and an incident drawer that can hand a selected marker back to the agent for analysis.
-- The analytics below the hero preserve the existing category, recurrence, tourism and departmental performance views.
+- The desktop layout places the agent and map side by side; on mobile the agent comes first and the map follows
+  immediately. Statistics, personal reports, filters and authority tools sit below this section. The intelligence
+  page retains its category, recurrence, tourism and departmental performance analytics.
 
 ## API
 

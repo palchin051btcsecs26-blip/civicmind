@@ -402,6 +402,11 @@
   padding-top: 4px;
 }
 
+.map-card__retry {
+  flex: none;
+  padding: 0 16px 14px;
+}
+
 .live-map {
   display: flex;
   flex-direction: column;

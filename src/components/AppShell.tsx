@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Icon, type IconName } from './Icon'
 import { Avatar } from './ui'
@@ -87,9 +87,11 @@ export function AppShell({ workspace, children }: { workspace: Workspace; childr
   const location = useLocation()
   const navigate = useNavigate()
   const [navOpen, setNavOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [query, setQuery] = useState('')
   const meta = WORKSPACES[workspace]
   const { user, logout } = useAuth()
+  const accountRef = useRef<HTMLDivElement | null>(null)
   const role = user?.role
   const { data: citizenData, reload: reloadCitizen } = useApi<CitizenPayload>(role === 'citizen' ? '/api/citizen' : null)
   const identity = user
@@ -113,14 +115,38 @@ export function AppShell({ workspace, children }: { workspace: Workspace; childr
   })
 
   async function signOut() {
-    await logout()
-    navigate('/welcome', { replace: true })
+    try {
+      await logout()
+    } catch {
+      // The auth provider clears local state even when the network request fails.
+    } finally {
+      setAccountOpen(false)
+      setNavOpen(false)
+      navigate('/welcome', { replace: true })
+    }
   }
 
   useEffect(() => {
     setNavOpen(false)
+    setAccountOpen(false)
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
   }, [location.pathname, location.search])
+
+  useEffect(() => {
+    if (!accountOpen) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAccountOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [accountOpen])
 
   useEffect(() => {
     document.body.classList.toggle('no-scroll', navOpen)
@@ -222,7 +248,7 @@ export function AppShell({ workspace, children }: { workspace: Workspace; childr
             </div>
           </div>
           <button type="button" className="sidebar-signout" onClick={() => void signOut()}>
-            <Icon name="arrowRight" size={13} /> Sign out
+            <Icon name="logout" size={13} /> {role === 'guest' ? 'Exit guest' : 'Log out'}
           </button>
         </div>
       </aside>
@@ -276,12 +302,54 @@ export function AppShell({ workspace, children }: { workspace: Workspace; childr
               </Link>
             ) : null}
 
-            <div className="topbar__user">
-              <Avatar initials={identity.initials} small />
-              <div className="identity">
-                <strong>{identity.name}</strong>
-                <span>{identity.meta}</span>
-              </div>
+            <div className="topbar__user account-menu" ref={accountRef}>
+              <button
+                type="button"
+                className="account-trigger"
+                aria-haspopup="menu"
+                aria-expanded={accountOpen}
+                aria-controls="account-menu-panel"
+                aria-label={`Account menu for ${identity.name}`}
+                onClick={() => setAccountOpen((open) => !open)}
+              >
+                <Avatar initials={identity.initials} small />
+                <div className="identity">
+                  <strong>{identity.name}</strong>
+                  <span>{identity.meta}</span>
+                </div>
+                <Icon name="chevronDown" size={12} className="account-trigger__chevron" />
+              </button>
+
+              {accountOpen ? (
+                <div className="account-menu__panel" id="account-menu-panel" role="menu" aria-label="Account">
+                  <div className="account-menu__head">
+                    <Avatar initials={identity.initials} />
+                    <div className="account-menu__identity">
+                      <strong>{identity.name}</strong>
+                      <span>{user?.email ?? identity.meta}</span>
+                    </div>
+                  </div>
+                  <div className="account-menu__role">
+                    <Icon name="shield" size={12} />
+                    {roleLabel}
+                  </div>
+                  <div className="account-menu__divider" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="account-menu__logout"
+                    onClick={() => void signOut()}
+                  >
+                    <Icon name="logout" size={15} />
+                    <span>{role === 'guest' ? 'Exit guest' : 'Log out'}</span>
+                  </button>
+                  <p className="account-menu__note">
+                    {role === 'guest'
+                      ? 'Your guest session is cleared when you exit.'
+                      : 'Your session ends on this device when you log out.'}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
         </header>
